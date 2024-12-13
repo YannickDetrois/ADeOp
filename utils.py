@@ -79,7 +79,7 @@ def run_remote_commands(sshclient, pop_size, n_gen, run_params):
     commands = [
         "conda activate carbon", # activate the environment with modeified pymoo, ...
         "cd Documents/AdsorptionModel_TCSA/src/optimisation/", # change to the run.py directory
-        f'echo """{get_string_run_params(run_params)}""" > params.json', # write the new run params to the params file
+        f"""echo '{get_string_run_params(run_params)}' > params.json""", # write the new run params to the params file
         f"python run.py --pop_size {pop_size} --n_gen {n_gen}" # run optimisation with the new params
     ]
 
