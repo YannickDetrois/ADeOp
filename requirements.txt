@@ -1,2 +1,2 @@
 paramiko
-wxPython
+wxpython
