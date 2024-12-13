@@ -1,2 +1,2 @@
 paramiko
-wxpython
+wxPython==4.2.2
