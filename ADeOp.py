@@ -1,9 +1,6 @@
 import streamlit as st
-import numpy as np
 import subprocess
-import json
-import sys
-from run_server import run_remote_commands
+from utils import *
 
 # Parameters and their default, min, and max values
 parameter_limits = {
@@ -61,7 +58,7 @@ with col_headers[2]:
 with col_headers[3]:
     st.subheader("Objectives")
 
-# Align parameters and objectives row by row
+# Align parameter text field and tick boxes
 level_1_cols = st.columns([5, 2], gap='medium')
 with level_1_cols[0]:
     for i, (param, limits) in enumerate(parameter_limits.items()):
@@ -88,6 +85,16 @@ with level_1_cols[0]:
             except ValueError:
                 params[param] = limits["default"]
 
+
+st.markdown("""
+    <style>
+        /* Target the checkbox elements specifically */
+        .stCheckbox {
+            margin-bottom: -10px;  /* Adjust this value to control the space */
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 with level_1_cols[1]:
     for i in range(len(objectives)): 
         obj = objectives[i]
@@ -98,50 +105,60 @@ st.subheader("Settings")
 settings_col1, settings_col2 = st.columns(2)
 
 with settings_col1:
+
     population_size = st.slider("Population Size", min_value=1, max_value=80, value=40)
     local_optimisation = st.button("Start Optimisation Locally", key='local', type="secondary")
 
 with settings_col2:
     num_generations = st.slider("Number of Generations", min_value=1, max_value=100, value=50)
-    server_optimisation = st.button("Start Optimisation On Server", key='server', type="primary")
+
+    subcol1, subcol2 = st.columns([1, 1]) 
+
+    with subcol1:
+        server_optimisation = st.button("Start Optimisation On Server", key='server', type="primary")
+        
+    with subcol2:
+        password = st.text_input("Password", type="password", key="password", label_visibility='collapsed', placeholder="Password")
 
 if local_optimisation or server_optimisation:
     
     consts = {param: (value if param_constants[param] else None) for param, value in params.items()}
     objs = {obj: objectives_selected[obj] for obj in objectives}
 
-    output_data = {
+    run_params = {
         "consts": consts,
         "objs": objs
     }
-
-    with open('../optimisation/params.json', 'w') as json_file:
-        json.dump(output_data, json_file, indent=4)
-
+    
     if local_optimisation:
-        
-        command = f"""cd ../optimisation && python ./run.py --pop_size {population_size} --n_gen {num_generations}"""
-        
-        try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
 
-            # Check if there was any error in stderr
-            if result.returncode != 0:
-                st.code(f"Error: {result.stderr}", language='text')
-            else:
-                st.code(result.stdout, language='text')
+        #run_path = threading.Thread(target=open_dir_dialog, daemon=True).start()
+        run_path = open_dir_dialog()
+        
+        if run_path:
+            command = f"""cd {run_path} && python ./run.py --pop_size {population_size} --n_gen {num_generations}"""
+            save_run_params(run_path, run_params)
 
-        except FileNotFoundError as e:
-            st.code(f"Command not found: {e}", language='text')
-        except Exception as e:
-            st.code(f"Error occurred: {e}", language='text')
+            try:
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+
+                # Check if there was any error in stderr
+                if result.returncode != 0:
+                    st.code(f"Error: {result.stderr}", language='text')
+                else:
+                    st.code(result.stdout, language='text')
+
+            except FileNotFoundError as e:
+                st.code(f"Command not found: {e}", language='text')
+            except Exception as e:
+                st.code(f"Error occurred: {e}", language='text')
 
     if server_optimisation:
         
         try:
             st.write("Running commands on the remote server...")
-
-            for message in run_remote_commands(population_size, num_generations):
+            sshclient = connect_remote(password)
+            for message in run_remote_commands(sshclient, population_size, num_generations, run_params):
                 if message == "All commands executed and connection closed.":
                     st.success(message)
                     break
